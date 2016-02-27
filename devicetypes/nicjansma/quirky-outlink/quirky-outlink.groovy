@@ -23,7 +23,7 @@
  *  Removal of 'reset' command
  *  Minor log additions, code style changes, protections against bad data, etc
  */
- 
+
 metadata {
     definition (name: "Quirky Outlink", namespace: "nicjansma", author: "Nic Jansma") {
         capability "Actuator"
