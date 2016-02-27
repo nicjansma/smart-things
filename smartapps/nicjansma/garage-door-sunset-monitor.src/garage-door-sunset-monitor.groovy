@@ -34,15 +34,31 @@ preferences {
         input "doors", "capability.contactSensor", title: "Which doors?", multiple: true
     }
 
-    section ("Sunset Offset (optional)") {
-        paragraph "How long before or after sunset do you want the check to happen?"
+    section ("Monitoring Type") {
+        paragraph "Do you want to monitor the garage door at specific times of the day, or based on the sunset?"
+        input(name: "monitoringType", type: "enum", title: "Monitoring Type", options: ["Time of Day", "Sunset"])
+    }
+
+    section ("Time of Day Monitoring") {
+        paragraph "If you selected 'Time of Day' monitoring, what times do you want to start/stop monitoring?"
+        input "startMonitoring", "time", title: "Start Monitoring (hh:mm 24h)", required: false
+        input "stopMonitoring", "time", title: "Stop Monitoring (hh:mm 24h)", required: false
+    }
+
+    section ("Sunset Monitoring") {
+        paragraph "If you selected 'Sunset' Monitoring, how long before or after sunset do you want the check to happen? (optional)"
         input "sunsetOffsetValue", "text", title: "HH:MM", required: false
         input "sunsetOffsetDir", "enum", title: "Before or After", required: false, metadata: [values: ["Before","After"]]
     }
 
     section ("Zipcode (optional)") {
-        paragraph "Zip code to determine Sunset from."
+        paragraph "Zip code for 'Sunset' Monitoring"
         input "zipCode", "text", title: "Zip Code", required: false
+    }
+
+    section ("Alert Thresholds") {
+        paragraph "How many minutes should the door be open in the evening before an alert is fired?  Note doors are only checked every 5 minutes, so you should select a multiple of 5"
+        input "threshold", "number", title: "Minutes (use multiples of 5)", defaultValue: 5, required: true
     }
 
     section("Notifications") {
@@ -65,16 +81,19 @@ def updated() {
 }
 
 def initialize() {
-    subscribe(location, "sunsetTime", sunriseSunsetTimeHandler)
-
     state.monitoring = false
     state.opened = [:]
+    state.threshold = 0
 
     doors?.each { door ->
         state.opened.put(door.displayName, false)
     }
-    
-    astroCheck()
+
+    // only hook into sunrise/sunset if we're doing Sunset monitoring
+    if (monitoringType == "Sunset") {
+        subscribe(location, "sunsetTime", sunriseSunsetTimeHandler)
+        astroCheck()
+    }
 
     runEvery5Minutes(checkDoors)
 }
@@ -87,6 +106,10 @@ def sunriseSunsetTimeHandler(evt) {
 
 def astroCheck() {
     def s
+
+    if (monitoringType != "Sunset") {
+        return
+    }
 
     if (zipCode) {
         s = getSunriseAndSunset(zipCode: zipCode, sunsetOffset: sunsetOffset)
@@ -134,15 +157,33 @@ def astroCheck() {
 def sunriseHandler() {
     log.info "Sunrise, stopping monitoring"
     state.monitoring = false
+
+    // re-schedule 5 minute task in case it's stuck
+    // https://community.smartthings.com/t/scheduler-and-polling-quits-after-some-minutes-hours-or-days/16997/241
+    runEvery5Minutes(checkDoors)
 }
 
 def sunsetHandler() {
     log.info "Sunset, starting monitoring"
     state.monitoring = true
+
+    // re-schedule 5 minute task in case it's stuck
+    // https://community.smartthings.com/t/scheduler-and-polling-quits-after-some-minutes-hours-or-days/16997/241
+    runEvery5Minutes(checkDoors)
 }
 
 def checkDoors() {
+    // if we're doing Time of Day monitoring, see if this is within the times they specified
+    if (monitoringType == "Time of Day") {
+        def currTime = now()
+        def eveningStartTime = timeToday(startMonitoring)
+        def morningEndTime = timeToday(stopMonitoring)
+
+        state.monitoring = currTime >= eveningStartTime.time || currTime <= morningEndTime.time
+    }
+
     log.info "Checking doors? $state.monitoring"
+
     if (!state.monitoring) {
         return
     }
@@ -154,11 +195,16 @@ def checkDoors() {
         log.debug("Door $doorName: $doorOpen")
 
         if (doorOpen == "open" && !state.opened[doorName]) {
-            send("Alert: It's sunset and $doorName is open")
-            state.opened[doorName] = true
+            state.threshold += 5
+
+            if (state.threshold >= threshold) {
+                send("Alert: It's sunset and $doorName is open for $threshold minutes")
+                state.opened[doorName] = true
+            }
         } else if (doorOpen == "closed" && state.opened[doorName]) {
-            send("Alert: $doorName closed")
+            send("OK: $doorName closed")
             state.opened[doorName] = false
+            state.threshold = 0
         }
     }
 }
