@@ -20,6 +20,12 @@ Device Type for my [Spark Core Water Sensor](https://github.com/nicjansma/spark-
 
 Device Type for my [Particle (Spark) Core / Photon / Electron Remote Temperature and Humidity Logger](https://github.com/nicjansma/dht-logger).
 
+### Quirky GE Outlink POTLK-WH01 Outlet
+
+`devicetypes/nicjansma/quirky-outlink/quirky-outlink.groovy`
+
+Device Type for [POTLK-WH01 outlets](http://www.amazon.com/Quirky-POTLK-WH01-Outlink-Remote-Outlet/dp/B00P1Q2MPY).
+
 ## Smart Apps
 
 ### Garage Door Sunset Monitor
