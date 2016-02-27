@@ -98,7 +98,7 @@ def getAll() {
 def parse(String description) {
     def pair = description.split(":")
 
-    createEvent(name: pair[0].trim(), value: pair[1].trim())
+    return createEvent(name: pair[0].trim(), value: pair[1].trim())
 }
 
 private getWater() {
