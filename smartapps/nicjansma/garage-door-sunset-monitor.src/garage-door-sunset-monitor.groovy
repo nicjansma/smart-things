@@ -11,7 +11,7 @@
  *   https://github.com/rogersmj/st-door-alert-after-dark
  *   https://github.com/SmartThingsCommunity/SmartThingsPublic/pull/396/files
  *
- * Starts monitoring at Sunset, and checks every 5 minutes afterwards to see if
+ * Starts monitoring at Sunset (or any other specified time), and checks every 5 minutes afterwards to see if
  * there was a state change to notify about.
  *
  * Date: 2016-01-05
@@ -57,7 +57,7 @@ preferences {
     }
 
     section ("Alert Thresholds") {
-        paragraph "How many minutes should the door be open in the evening before an alert is fired?  Note doors are only checked every 5 minutes, so you should select a multiple of 5"
+        paragraph "How many minutes should the door be open in the before an alert is fired?  Note doors are only checked every 5 minutes, so you should select a multiple of 5 (0, 5, 10, etc)"
         input "threshold", "number", title: "Minutes (use multiples of 5)", defaultValue: 5, required: true
     }
 
@@ -157,19 +157,11 @@ def astroCheck() {
 def sunriseHandler() {
     log.info "Sunrise, stopping monitoring"
     state.monitoring = false
-
-    // re-schedule 5 minute task in case it's stuck
-    // https://community.smartthings.com/t/scheduler-and-polling-quits-after-some-minutes-hours-or-days/16997/241
-    runEvery5Minutes(checkDoors)
 }
 
 def sunsetHandler() {
     log.info "Sunset, starting monitoring"
     state.monitoring = true
-
-    // re-schedule 5 minute task in case it's stuck
-    // https://community.smartthings.com/t/scheduler-and-polling-quits-after-some-minutes-hours-or-days/16997/241
-    runEvery5Minutes(checkDoors)
 }
 
 def checkDoors() {
@@ -182,7 +174,7 @@ def checkDoors() {
         state.monitoring = currTime >= eveningStartTime.time || currTime <= morningEndTime.time
     }
 
-    log.info "Checking doors? $state.monitoring"
+    log.info "checkDoors: Should we check? $state.monitoring"
 
     if (!state.monitoring) {
         return
@@ -192,17 +184,25 @@ def checkDoors() {
         def doorName = door.displayName
         def doorOpen = checkDoor(door)
 
-        log.debug("Door $doorName: $doorOpen")
+        log.debug("checkDoors: Door $doorName: $doorOpen, previous state: " + state.opened[doorName])
 
         if (doorOpen == "open" && !state.opened[doorName]) {
-            state.threshold += 5
+            // previously closed, now open
+            state.threshold = state.threshold + 5
+            log.debug("checkDoors: Door was closed, is now open.  Threshold check: ${state.threshold} minutes (need " + threshold + "minutes)")
 
             if (state.threshold >= threshold) {
+                log.debug("checkDoors: Door has been open past threshold, sending an alert")
+
                 send("Alert: It's sunset and $doorName is open for $threshold minutes")
                 state.opened[doorName] = true
             }
         } else if (doorOpen == "closed" && state.opened[doorName]) {
+            // previously open, now closed
+            log.debug("checkDoors: Door had been previously open, is now closed")
+
             send("OK: $doorName closed")
+
             state.opened[doorName] = false
             state.threshold = 0
         }
