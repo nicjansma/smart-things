@@ -12,7 +12,6 @@
  * people moving from room to room in the evening, e.g. from Kitchen to Living Room to Bedroom as the night progresses.
  */
 
-// Automatically generated. Make future change here.
 definition(
     name: "Home Alone Lighting",
     namespace: "nicjansma",
@@ -20,7 +19,8 @@ definition(
     category: "Safety & Security",
     description: "Simulates someone being home by turning lights on then off in different room as the night progresses",
     iconUrl: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn.png",
-    iconX2Url: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn@2x.png"
+    iconX2Url: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn@2x.png",
+    iconX3Url: "http://cdn.device-icons.smartthings.com/Lighting/light11-icn@3x.png"
 )
 
 preferences {
@@ -32,21 +32,21 @@ preferences {
     }
 
     section("Group 2") {
-    	input "group2Enabled", "bool", title: "Enabled", required: true, defaultValue: false
+        input "group2Enabled", "bool", title: "Enabled", required: true, defaultValue: false
         input "group2Lights", "capability.switch", title: "Which lights?", multiple: true
         input "group2Start", "time", title: "Start Time (hh:mm 24h)", required: false
         input "group2End", "time", title: "Stop Time (hh:mm 24h)", required: false
     }
 
     section("Group 3") {
-    	input "group3Enabled", "bool", title: "Enabled", required: true, defaultValue: false
+        input "group3Enabled", "bool", title: "Enabled", required: true, defaultValue: false
         input "group3Lights", "capability.switch", title: "Which lights?", multiple: true
         input "group3Start", "time", title: "Start Time (hh:mm 24h)", required: false
         input "group3End", "time", title: "Stop Time (hh:mm 24h)", required: false
     }
 
     section("Group 4") {
-    	input "group4Enabled", "bool", title: "Enabled", required: true, defaultValue: false
+        input "group4Enabled", "bool", title: "Enabled", required: true, defaultValue: false
         input "group4Lights", "capability.switch", title: "Which lights?", multiple: true
         input "group4Start", "time", title: "Start Time (hh:mm 24h)", required: false
         input "group4End", "time", title: "Stop Time (hh:mm 24h)", required: false
@@ -58,16 +58,22 @@ preferences {
     }
 
     section ("Modes") {
-        mode(name: "mode", title: "Which mode should this run in?", required: true)
+        mode(name: "mode", title: "Which mode should this run in?", required: true, multiple: false)
     }
 }
 
+/**
+ * Run when the app is installed
+ */
 def installed() {
     log.debug "Installed"
 
     initialize()
 }
 
+/**
+ * Run when the app is updated
+ */
 def updated() {
     log.debug "Updated"
 
@@ -76,6 +82,9 @@ def updated() {
     initialize()
 }
 
+/**
+ * Run to reset the app
+ */
 def reset() {
     log.debug "Reset"
 
@@ -86,37 +95,54 @@ def reset() {
     unschedule()
 }
 
+/**
+ * Initializes the app - configures schedules and ensures the initial state
+ */
 def initialize() {
     log.debug "Initializing"
 
+    // ensure we generate a new schedule today
     state.lastScheduledDay = 0
 
     checkForNewSchedule()
 
     log.debug "Configuring loop()"
 
+    // setup schedules
     runEvery5Minutes(loop)
     runEvery1Hour(checkForNewSchedule)
 }
 
+/**
+ * Main loop - Determines if any lights need to be changed
+ */
 def loop() {
     log.debug "loop()"
 
+    if (location.mode != mode) {
+        log.debug "loop(): Not running in this mode"
+        return
+    }
+
     def now = (new Date()).time
 
+    // look to see if any of the groups need their lights changed
     for (def i = 0; i <= 3; i++) {
         def groupNum = i + 1
-        
-        log.debug "i # $i"
-        log.debug "Group # $groupNum"
-        log.debug state.groups[i]
 
-        if (!state.groups[i] || !state.groups[i].enabled) {
+        // string index
+        def groupIdx = i + ""
+
+        log.debug "Group # $groupNum" + state.groups[groupIdx]
+
+        if (!state.groups[groupIdx] || !state.groups[groupIdx].enabled) {
             log.debug "Skipping Group #${groupNum} because it is not enabled"
             continue
         }
 
-        def group = state.groups[i]
+        def group = state.groups[groupIdx]
+
+        // determine which lights to use
         def lights
         if (i == 0) {
             lights = group1Lights
@@ -128,13 +154,13 @@ def loop() {
             lights = group4Lights
         }
 
-        log.debug "Group #${groupNum}: group.on: ${group.on} start: ${group.start} end: ${group.end} now: ${now}"
-
         if (!group.on && now > group.start && now < group.end) {
+            // the lights were off, but should be turned on
             log.debug "Group #${groupNum}: Turning on"
             lights.on()
             group.on = true
         } else if (group.on && now > group.end) {
+            // the lights we on, but should be turned off
             log.debug "Group #${groupNum}: Turning off"
             lights.off()
             group.on = false
@@ -142,14 +168,19 @@ def loop() {
             log.debug "Group #${groupNum}: No change"
         }
     }
-    
+
     log.debug "loop() complete"
 }
 
+/**
+ * Run daily to determine if a new schedule should be picked
+ */
 def checkForNewSchedule() {
+    // determine what day of the year this is
     Calendar cal = Calendar.getInstance()
     def day = cal.get(Calendar.DAY_OF_YEAR)
 
+    // if we haven't scheduled lights for today, do so now
     if (state.lastScheduledDay != day) {
         log.debug "Picking a new schedule for day # ${day}"
 
@@ -163,14 +194,19 @@ def checkForNewSchedule() {
         state.lastScheduledDay = day
     }
 
+    // make sure our lights are in the correct state
     loop()
 }
 
+/**
+ * Schedules the specific group
+ */
 def schedule(num, enabled, start, end) {
     def group = [:]
     group.enabled = false
 
     if (!enabled || start == null || end == null) {
+        // light is disabled or not configured
         state.groups[num - 1] = group
         log.debug "schedule(): Skipping #${num} because not everything is defined"
         return
@@ -178,6 +214,7 @@ def schedule(num, enabled, start, end) {
 
     group.enabled = true
 
+    // pick a new time to start
     def random = new Random()
 
     def plusMinus = random.nextBoolean() ? 1 : -1
@@ -189,6 +226,7 @@ def schedule(num, enabled, start, end) {
 
     def startRand = new Date(timeToday(start).time + (plusMinus * rnd * 1000 * 60))
 
+    // pick a new time to end
     plusMinus = random.nextBoolean() ? 1 : -1
     if (randomMinutes > 0) {
         rnd = plusMinus * random.nextInt(randomMinutes)
@@ -204,5 +242,7 @@ def schedule(num, enabled, start, end) {
     group.end = endRand.time
     group.on = false
 
-    state.groups[num - 1] = group
+    // save this group to state
+    // (note we should use a string index as that's how it will be serialized)
+    state.groups[(num - 1) + ""] = group
 }
