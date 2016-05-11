@@ -25,24 +25,28 @@ definition(
 
 preferences {
     section("Group 1") {
+        input "group1Enabled", "bool", title: "Enabled", required: true, defaultValue: true
         input "group1Lights", "capability.switch", title: "Which lights?", multiple: true
         input "group1Start", "time", title: "Start Time (hh:mm 24h)", required: false
         input "group1End", "time", title: "Stop Time (hh:mm 24h)", required: false
     }
 
     section("Group 2") {
+    	input "group2Enabled", "bool", title: "Enabled", required: true, defaultValue: false
         input "group2Lights", "capability.switch", title: "Which lights?", multiple: true
         input "group2Start", "time", title: "Start Time (hh:mm 24h)", required: false
         input "group2End", "time", title: "Stop Time (hh:mm 24h)", required: false
     }
 
     section("Group 3") {
+    	input "group3Enabled", "bool", title: "Enabled", required: true, defaultValue: false
         input "group3Lights", "capability.switch", title: "Which lights?", multiple: true
         input "group3Start", "time", title: "Start Time (hh:mm 24h)", required: false
         input "group3End", "time", title: "Stop Time (hh:mm 24h)", required: false
     }
 
     section("Group 4") {
+    	input "group4Enabled", "bool", title: "Enabled", required: true, defaultValue: false
         input "group4Lights", "capability.switch", title: "Which lights?", multiple: true
         input "group4Start", "time", title: "Start Time (hh:mm 24h)", required: false
         input "group4End", "time", title: "Stop Time (hh:mm 24h)", required: false
@@ -105,7 +109,7 @@ def loop() {
         
         log.debug "i # $i"
         log.debug "Group # $groupNum"
-        log.debug state.groups
+        log.debug state.groups[i]
 
         if (!state.groups[i] || !state.groups[i].enabled) {
             log.debug "Skipping Group #${groupNum} because it is not enabled"
@@ -113,16 +117,26 @@ def loop() {
         }
 
         def group = state.groups[i]
+        def lights
+        if (i == 0) {
+            lights = group1Lights
+        } else if (i == 1) {
+            lights = group2Lights
+        } else if (i == 2) {
+            lights = group3Lights
+        } else if (i == 3) {
+            lights = group4Lights
+        }
 
         log.debug "Group #${groupNum}: group.on: ${group.on} start: ${group.start} end: ${group.end} now: ${now}"
 
         if (!group.on && now > group.start && now < group.end) {
             log.debug "Group #${groupNum}: Turning on"
-            group.lights.on()
+            lights.on()
             group.on = true
         } else if (group.on && now > group.end) {
             log.debug "Group #${groupNum}: Turning off"
-            group.lights.off()
+            lights.off()
             group.on = false
         } else {
             log.debug "Group #${groupNum}: No change"
@@ -141,10 +155,10 @@ def checkForNewSchedule() {
 
         state.groups = [:]
 
-        schedule(1, group1Lights, group1Start, group1End)
-        schedule(2, group2Lights, group2Start, group2End)
-        schedule(3, group3Lights, group3Start, group3End)
-        schedule(4, group4Lights, group4Start, group4End)
+        schedule(1, group1Enabled, group1Start, group1End)
+        schedule(2, group2Enabled, group2Start, group2End)
+        schedule(3, group3Enabled, group3Start, group3End)
+        schedule(4, group4Enabled, group4Start, group4End)
 
         state.lastScheduledDay = day
     }
@@ -152,12 +166,11 @@ def checkForNewSchedule() {
     loop()
 }
 
-def schedule(num, lights, start, end) {
+def schedule(num, enabled, start, end) {
     def group = [:]
-    group.lights = lights
     group.enabled = false
 
-    if (lights == null || start == null || end == null) {
+    if (!enabled || start == null || end == null) {
         state.groups[num - 1] = group
         log.debug "schedule(): Skipping #${num} because not everything is defined"
         return
