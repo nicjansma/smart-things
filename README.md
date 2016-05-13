@@ -33,3 +33,15 @@ Device Type for [POTLK-WH01 outlets](http://www.amazon.com/Quirky-POTLK-WH01-Out
 `smartapps/nicjansma/garage-door-sunset-monitor.src/garage-door-sunset-monitor.groovy`
 
 App that monitors your Garage door and alerts you if it's open after sunset.
+
+### Home Alone
+
+`smartapps/nicjansma/home-alone.src/home-alone.groovy`
+
+Simulates someone being home by turning lights on then off in different room as the night progresses.
+
+### IoT Logger
+
+`smartapps/nicjansma/iot-logger.src/iot-logger.groovy`
+
+Log SmartThings events to any HTTP endpoint
