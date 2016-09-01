@@ -12,18 +12,15 @@
  *
  */
 /**
- * Original source via Mitch Pond:
+ * Original source:
  *  https://github.com/mitchpond/SmartThingsPublic/blob/outlink/devicetypes/mitchpond/quirky-outlink.src/quirky-outlink.groovy
  *
  * Modifications from: Nic Jansma:
- *  https://github.com/nicjansma/smart-things
- *
- * Changes:
  *  Reporting of both power (instantaneous W) and energy (overall kWh)
  *  Removal of 'reset' command
- *  Minor log additions, code style changes, protections against bad data, etc
+ *  Coding style
  */
-
+ 
 metadata {
     definition (name: "Quirky Outlink", namespace: "nicjansma", author: "Nic Jansma") {
         capability "Actuator"
@@ -147,8 +144,11 @@ def configure() {
 
 private decodeHexEnergyUsage(String hexValue) {
     // The Outlink reports in kWh, with a conversion factor of 1/3600000
-    def rawValue = Integer.parseInt(hexValue, 16)
+    def rawValue = Long.parseLong(hexValue, 16)
     def scaledValue = rawValue / 3600000
+
+    // round to two digits
+    scaledValue = Math.round(scaledValue * 100) / 100
 
     log.debug "decodeHexEnergyUsage: $rawValue / 3600000 = $scaledValue"
 
@@ -172,7 +172,12 @@ private getInstantDemand() {
         // h
         def deltaT = (recentEvents[0].date.getTime() - recentEvents[1].date.getTime()) / 3600000
 
-        def result = deltaE / deltaT
+        def result = Math.round(deltaE / deltaT * 100) / 100
+
+        if (result < 0) {
+            // sanity check for first few measurements
+            result = 0
+        }
 
         log.debug "getInstantDemand: deltaE: $deltaE deltaT: $deltaT"
         log.debug "getInstantDemand: result: $result"
