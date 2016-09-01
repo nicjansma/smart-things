@@ -176,7 +176,7 @@ private getInstantDemand() {
 
         if (result < 0) {
             // sanity check for first few measurements
-            result = 0
+            result = 0.0
         }
 
         log.debug "getInstantDemand: deltaE: $deltaE deltaT: $deltaT"
