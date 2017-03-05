@@ -205,6 +205,10 @@ def checkDoors() {
 
             state.opened[doorName] = false
             state.threshold = 0
+        } else if (doorOpen == "closed"){
+            // Door closed before threshold, reset threshold
+            log.debug("checkDoors: Door closed before " + threshold + " threshold.  Threshold check: ${state.threshold} minutes (threshold reset to 0)")
+            state.threshold = 0
         }
     }
 }
